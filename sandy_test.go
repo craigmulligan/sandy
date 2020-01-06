@@ -15,9 +15,13 @@ func TestSum(t *testing.T) {
 	// introspect :)
 	call_count = 0
 	s := []string{"sandy.go"}
-	Exec("cat", s, ask)
+	reqs, err := Exec("cat", s)
 
-	if call_count != 9 {
-		t.Errorf("call_count was incorrect, got: %d, want: %d.", call_count, 10)
+	if err != nil {
+		t.Errorf("Something went wrong")
+	}
+
+	if len(reqs) != 2 {
+		t.Errorf("reqs count was incorrect, got: %d, want: %d.", len(reqs), 2)
 	}
 }

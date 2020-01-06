@@ -4,13 +4,11 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 )
-
-type RequestPermission func(string) (string, error)
 
 type Request struct {
 	path    string
@@ -18,8 +16,26 @@ type Request struct {
 	allowed bool
 }
 
-func Exec(bin string, args []string, requestPermission RequestPermission) {
+func requestPermission(path string) (Request, error) {
+	scanner := bufio.NewScanner(os.Stdin)
+	fmt.Println(fmt.Sprintf("Wanting to READ %s [y/n]", path))
+	for scanner.Scan() {
+		input := strings.ToLower(scanner.Text())
+		if input == "y" {
+			break
+		}
+		if scanner.Text() == "n" {
+			return Request{path, "READ", false}, nil
+		}
+
+		fmt.Println("Sorry I didn't understand")
+	}
+	return Request{path, "READ", true}, nil
+}
+
+func Exec(bin string, args []string) (map[string]Request, error) {
 	var regs syscall.PtraceRegs
+	reqs := make(map[string]Request)
 	cmd := exec.Command(bin, args...)
 	cmd.Stderr = nil
 	cmd.Stdin = nil
@@ -33,59 +49,54 @@ func Exec(bin string, args []string, requestPermission RequestPermission) {
 		// fmt.Printf("Wait returned: %v\n", err)
 	}
 	pid := cmd.Process.Pid
-	exit := true
 
 	for {
-		if exit {
-			err = syscall.PtraceGetRegs(pid, &regs)
-			if err != nil {
-				break
-			}
-
-			// https://stackoverflow.com/questions/33431994/extracting-system-call-name-and-arguments-using-ptrace
-			if regs.Orig_rax == 0 {
-				path, err := os.Readlink(fmt.Sprintf("/proc/%d/fd/%d", pid, regs.Rdi))
-
-				if err != nil {
-					log.Fatal(err)
-				}
-
-				_, err = requestPermission(path)
-				if err != nil {
-					log.Fatal(err)
-				}
-			}
-			// TODO: print syscall parameters
-		}
-		err = syscall.PtraceSyscall(pid, 0)
+		err = syscall.PtraceGetRegs(pid, &regs)
 		if err != nil {
-			panic(err)
-		}
-		_, err = syscall.Wait4(pid, nil, 0, nil)
-		if err != nil {
-			panic(err)
-		}
-		exit = !exit
-	}
-}
-
-func askPermission(path string) (string, error) {
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Println(fmt.Sprintf("Wanting to use %s, type y to allow and n to deny.", path))
-	for scanner.Scan() {
-		if scanner.Text() == "y" {
 			break
 		}
-		if scanner.Text() == "n" {
-			fmt.Println("Tried to access a file it is not allowed to.")
-			return "", errors.New("Not Allowed")
+
+		// https://stackoverflow.com/questions/33431994/extracting-system-call-name-and-arguments-using-ptrace
+		if regs.Orig_rax == 0 {
+			path, err := os.Readlink(fmt.Sprintf("/proc/%d/fd/%d", pid, regs.Rdi))
+
+			if err != nil {
+				return nil, err
+			}
+
+			_, ok := reqs[path]
+
+			if !ok {
+				req, err := requestPermission(path)
+
+				if !req.allowed {
+					return nil, errors.New(fmt.Sprintf("Blocked %s on %s", req.syscall, req.path))
+				}
+
+				reqs[req.path] = req
+
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
 
-		fmt.Println("Sorry I didn't understand")
+		err = syscall.PtraceSyscall(pid, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		_, err = syscall.Wait4(pid, nil, 0, nil)
+		if err != nil {
+			return nil, err
+		}
 	}
-	return path, nil
+	return reqs, nil
 }
 
 func main() {
-	Exec(os.Args[1], os.Args[2:], askPermission)
+	_, err := Exec(os.Args[1], os.Args[2:])
+	if err != nil {
+		fmt.Println(err)
+	}
 }
