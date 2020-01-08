@@ -3,9 +3,11 @@ package main
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -28,12 +30,13 @@ func requestPermission(path string) (Request, error) {
 			return Request{path, "READ", false}, nil
 		}
 
-		fmt.Println("Sorry I didn't understand")
+		// Make a sounds
+		fmt.Printf("\a")
 	}
 	return Request{path, "READ", true}, nil
 }
 
-func Exec(bin string, args []string) (map[string]Request, error) {
+func Exec(bin string, args []string, allowedPatterns []string) (map[string]Request, error) {
 	var regs syscall.PtraceRegs
 	reqs := make(map[string]Request)
 	cmd := exec.Command(bin, args...)
@@ -68,8 +71,22 @@ func Exec(bin string, args []string) (map[string]Request, error) {
 			}
 
 			_, ok := reqs[path]
-
 			if !ok {
+				for _, pattern := range allowedPatterns {
+
+					matched, err := filepath.Match(path, pattern)
+					fmt.Println("MATCH: %s, %t", path, matched)
+
+					if matched {
+						matchedReq := Request{path, "READ", true}
+						reqs[path] = matchedReq
+					}
+
+					if err != nil {
+						return nil, err
+					}
+				}
+
 				req, err := requestPermission(path)
 
 				if !req.allowed {
@@ -97,8 +114,30 @@ func Exec(bin string, args []string) (map[string]Request, error) {
 	return reqs, nil
 }
 
+type arrayFlags []string
+
+func (i *arrayFlags) String() string {
+	return "my string representation"
+}
+
+func (i *arrayFlags) Set(value string) error {
+	*i = append(*i, value)
+	return nil
+}
+
 func main() {
-	_, err := Exec(os.Args[1], os.Args[2:])
+	var allowedPattern arrayFlags
+	allowedPattern = append(allowedPattern, "libc")
+
+	flag.Var(&allowedPattern, "y", "Some description for this param.")
+
+	flag.Parse()
+
+	fmt.Println("word:", allowedPattern)
+	args := flag.Args()
+	fmt.Println(args)
+
+	_, err := Exec(args[0], args[1:], allowedPattern)
 	if err != nil {
 		fmt.Println(err)
 	}
