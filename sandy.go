@@ -41,8 +41,11 @@ func Exec(bin string, args []string) (map[string]Request, error) {
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Ptrace: true,
+		Ptrace:    true,
+		Pdeathsig: syscall.SIGKILL,
 	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
 	cmd.Start()
 	err := cmd.Wait()
 	if err != nil {
