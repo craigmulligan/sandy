@@ -5,9 +5,9 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"github.com/gobwas/glob"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"syscall"
 )
@@ -50,14 +50,11 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Start()
-	err := cmd.Wait()
-	if err != nil {
-		// fmt.Printf("Wait returned: %v\n", err)
-	}
+	_ = cmd.Wait()
 	pid := cmd.Process.Pid
 
 	for {
-		err = syscall.PtraceGetRegs(pid, &regs)
+		err := syscall.PtraceGetRegs(pid, &regs)
 		if err != nil {
 			break
 		}
@@ -70,22 +67,24 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 				return nil, err
 			}
 
+			for _, pattern := range allowedPatterns {
+				// we match the incoming paths against the input whitelist
+				// and automatically create approved requests.
+				g := glob.MustCompile(pattern)
+				matched := g.Match(path)
+
+				if matched {
+					matchedReq := Request{path, "READ", true}
+					reqs[path] = matchedReq
+				}
+
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			_, ok := reqs[path]
 			if !ok {
-				for _, pattern := range allowedPatterns {
-
-					matched, err := filepath.Match(path, pattern)
-					fmt.Println("MATCH: %s, %t", path, matched)
-
-					if matched {
-						matchedReq := Request{path, "READ", true}
-						reqs[path] = matchedReq
-					}
-
-					if err != nil {
-						return nil, err
-					}
-				}
 
 				req, err := requestPermission(path)
 
@@ -117,7 +116,7 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 type arrayFlags []string
 
 func (i *arrayFlags) String() string {
-	return "my string representation"
+	return ""
 }
 
 func (i *arrayFlags) Set(value string) error {
@@ -127,15 +126,14 @@ func (i *arrayFlags) Set(value string) error {
 
 func main() {
 	var allowedPattern arrayFlags
-	allowedPattern = append(allowedPattern, "libc")
+
+	// TODO add sane defaults like libc etc
+	allowedPattern = append(allowedPattern, "")
 
 	flag.Var(&allowedPattern, "y", "Some description for this param.")
-
 	flag.Parse()
 
-	fmt.Println("word:", allowedPattern)
 	args := flag.Args()
-	fmt.Println(args)
 
 	_, err := Exec(args[0], args[1:], allowedPattern)
 	if err != nil {
