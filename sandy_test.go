@@ -24,7 +24,11 @@ func TestExec(t *testing.T) {
 func TestInput(t *testing.T) {
 	cmd := exec.Command("./sandy", "cat", "./password.txt")
 	var out bytes.Buffer
+	var in bytes.Buffer
 	cmd.Stdout = &out
+	cmd.Stdout = &in
+	in.Write("n\n\r")
+
 	err := cmd.Run()
 	if err != nil {
 		t.Errorf("Something went wrong")
