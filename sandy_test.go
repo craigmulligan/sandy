@@ -27,17 +27,19 @@ func TestInput(t *testing.T) {
 	var in bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Stdout = &in
-	in.Write("n\n\r")
+	in.Write([]byte("n\n\r"))
 
 	err := cmd.Run()
 	if err != nil {
 		t.Errorf("Something went wrong")
 	}
-	if !strings.Contains(out.String(), "Blocked READ on ") {
-		t.Errorf("Expected %s output got %s", "123", out.String())
+	if strings.Contains(out.String(), "Blocked READ on ...") {
+		t.Errorf("Expected %s output got %s", "Blocked READ on ...", out.String())
 	}
 }
 
+// TODO we probably should instead just pass a mock reader for stdin into the Exec function and then call the fn
+// directly rather that full bin tests
 func TestAllowList(t *testing.T) {
 	cmd := exec.Command("./sandy", "--y", "*.so", "--y", "*.txt", "cat", "./password.txt")
 	var out bytes.Buffer
