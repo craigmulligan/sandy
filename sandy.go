@@ -36,15 +36,17 @@ func requestPermission(path string) (Request, error) {
 	return Request{path, "READ", true}, nil
 }
 
-func Exec(bin string, args []string, allowedPatterns []string) (map[string]Request, error) {
+func Exec(bin string, args, allowedPatterns, blockedPatterns []string) (map[string]Request, error) {
 	var regs syscall.PtraceRegs
 	reqs := make(map[string]Request)
 	cmd := exec.Command(bin, args...)
+
 	cmd.Stderr = nil
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Ptrace:    true,
+		Ptrace: true,
+		// TODO Pdeathsig a linux only
 		Pdeathsig: syscall.SIGKILL,
 	}
 	cmd.Stdout = os.Stdout
@@ -61,6 +63,7 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 
 		// https://stackoverflow.com/questions/33431994/extracting-system-call-name-and-arguments-using-ptrace
 		if regs.Orig_rax == 0 {
+			// TODO this is a cross-x barrier
 			path, err := os.Readlink(fmt.Sprintf("/proc/%d/fd/%d", pid, regs.Rdi))
 
 			if err != nil {
@@ -68,8 +71,6 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 			}
 
 			for _, pattern := range allowedPatterns {
-				// we match the incoming paths against the input whitelist
-				// and automatically create approved requests.
 				g := glob.MustCompile(pattern)
 				matched := g.Match(path)
 
@@ -83,19 +84,38 @@ func Exec(bin string, args []string, allowedPatterns []string) (map[string]Reque
 				}
 			}
 
-			_, ok := reqs[path]
+			for _, pattern := range blockedPatterns {
+				g := glob.MustCompile(pattern)
+				matched := g.Match(path)
+
+				if matched {
+					matchedReq := Request{path, "READ", false}
+					reqs[path] = matchedReq
+				}
+
+				if err != nil {
+					return nil, err
+				}
+			}
+
+			req, ok := reqs[path]
+
 			if !ok {
-
 				req, err := requestPermission(path)
+				reqs[req.path] = req
 
+				// Throw and exit the command
 				if !req.allowed {
 					return nil, errors.New(fmt.Sprintf("Blocked %s on %s", req.syscall, req.path))
 				}
 
-				reqs[req.path] = req
-
 				if err != nil {
 					return nil, err
+				}
+			} else {
+				// Throw and exit the command
+				if !req.allowed {
+					return nil, errors.New(fmt.Sprintf("Blocked %s on %s", req.syscall, req.path))
 				}
 			}
 		}
@@ -126,16 +146,25 @@ func (i *arrayFlags) Set(value string) error {
 
 func main() {
 	var allowedPattern arrayFlags
+	var blockedPattern arrayFlags
 
 	// TODO add sane defaults like libc etc
 	allowedPattern = append(allowedPattern, "")
 
-	flag.Var(&allowedPattern, "y", "Some description for this param.")
+	flag.Var(&allowedPattern, "y", "A glob pattern for automatically allowing file reads.")
+	flag.Var(&blockedPattern, "n", "A glob pattern for automatically blocking file reads.")
+	help := flag.Bool("h", false, "Print Usage.")
+
 	flag.Parse()
+
+	if *help == true {
+		flag.Usage()
+		return
+	}
 
 	args := flag.Args()
 
-	_, err := Exec(args[0], args[1:], allowedPattern)
+	_, err := Exec(args[0], args[1:], allowedPattern, blockedPattern)
 	if err != nil {
 		fmt.Println(err)
 	}
