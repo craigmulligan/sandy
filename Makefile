@@ -2,7 +2,6 @@
 install: go.sum
 	go get -v -t
 
-
 .PHONY: build 
 build: install
 	go build -o sandy 
