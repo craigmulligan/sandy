@@ -21,21 +21,21 @@ Usage of ./sandy:
 
 ## Use cases
 
-1. You want to install anything
+### You want to install anything
 
 ```shell
-> sandy -n "/etc/password.txt" npm i sketchy-module
+> sandy -n "/etc/password.txt" npm install sketchy-module
 
-  BLOCKED READ on /sketchy-module
+  BLOCKED READ on /etc/password.txt
 ```
 
 ```shell
 > sandy -n "/etc/password.txt" bash <(curl  https://danger.zone/install.sh)
 
-  BLOCKED READ on /sketchy-module
+  BLOCKED READ on /etc/password.txt
 ```
 
-1. You are interested in what file reads you favourite program makes.
+### You are interested in what file reads you favourite program makes.
 
 Sure you could use strace, but it references file descriptors sandy makes the this much easier at a glance by printing the absolute path of the fd.
 
@@ -44,7 +44,7 @@ Sure you could use strace, but it references file descriptors sandy makes the th
 Wanting to READ /usr/lib/x86_64-linux-gnu/libselinux.so.1 [y/n]
 ```
 
-1. You _don't_ want to buy your friends beer
+### You _don't_ want to buy your friends beer
 
 A friend at work knows that you are security conscious and that you keep a `/free-beer.bounty` file in home directory. With the promise of a round of drinks and office wide humiliation Dave tries to trick you with a malicious script under the guise of being a helpful colleague.
 
