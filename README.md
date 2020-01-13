@@ -4,6 +4,8 @@
 
 Sandy uses Ptrace to hook into READ syscalls, giving you the option to accept or deny syscalls before they are executed.
 
+**WARNING**: While sandy is able to intercept READ syscalls there are a variety of ways to get around this. Full details can be found in the [hackernews thread](https://news.ycombinator.com/item?id=22025986). Some of which can be patched to catch simple attacks, but you should use sandy with the expectation that it is better than nothing but it is not true isolation.
+
 ## Usage
 
 ```
