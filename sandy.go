@@ -51,8 +51,12 @@ func Exec(bin string, args, allowedPatterns, blockedPatterns []string) (map[stri
 	}
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Start()
+	err := cmd.Start()
+	if err != nil {
+		return nil, fmt.Errorf("error while starting: %w", err)
+	}
 	_ = cmd.Wait()
+
 	pid := cmd.Process.Pid
 
 	for {
@@ -78,10 +82,6 @@ func Exec(bin string, args, allowedPatterns, blockedPatterns []string) (map[stri
 					matchedReq := Request{path, "READ", true}
 					reqs[path] = matchedReq
 				}
-
-				if err != nil {
-					return nil, err
-				}
 			}
 
 			for _, pattern := range blockedPatterns {
@@ -92,16 +92,15 @@ func Exec(bin string, args, allowedPatterns, blockedPatterns []string) (map[stri
 					matchedReq := Request{path, "READ", false}
 					reqs[path] = matchedReq
 				}
-
-				if err != nil {
-					return nil, err
-				}
 			}
 
 			req, ok := reqs[path]
 
 			if !ok {
 				req, err := requestPermission(path)
+				if err != nil {
+					return nil, err
+				}
 				reqs[req.path] = req
 
 				// Throw and exit the command
@@ -109,9 +108,6 @@ func Exec(bin string, args, allowedPatterns, blockedPatterns []string) (map[stri
 					return nil, errors.New(fmt.Sprintf("Blocked %s on %s", req.syscall, req.path))
 				}
 
-				if err != nil {
-					return nil, err
-				}
 			} else {
 				// Throw and exit the command
 				if !req.allowed {
