@@ -13,7 +13,7 @@ func TestExec(t *testing.T) {
 	reqs, err := Exec("cat", s, patterns, patterns)
 
 	if err != nil {
-		t.Errorf("Something went wrong")
+		t.Errorf("Something went wrong: %v", err)
 	}
 
 	if len(reqs) != 2 {
@@ -31,7 +31,7 @@ func TestInput(t *testing.T) {
 
 	err := cmd.Run()
 	if err != nil {
-		t.Errorf("Something went wrong")
+		t.Errorf("Something went wrong: %v", err)
 	}
 	if strings.Contains(out.String(), "Blocked READ on ...") {
 		t.Errorf("Expected %s output got %s", "Blocked READ on ...", out.String())
@@ -46,7 +46,7 @@ func TestAllowList(t *testing.T) {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		t.Errorf("Something went wrong")
+		t.Errorf("Something went wrong: %v", err)
 	}
 	if out.String() != "123\n" {
 		t.Errorf("Expected %s output got %s", "123", out.String())
@@ -59,10 +59,10 @@ func TestBlockList(t *testing.T) {
 	cmd.Stdout = &out
 	err := cmd.Run()
 	if err != nil {
-		t.Errorf("Something went wrong")
+		t.Errorf("Something went wrong: %v", err)
 	}
 	if !strings.Contains(out.String(), "Blocked READ on ") {
-		t.Errorf("Expected %s output got %s", "123", out.String())
+		t.Errorf("Expected %s output got %s", "Blocked READ on", out.String())
 	}
 }
 
@@ -73,7 +73,7 @@ func TestHelp(t *testing.T) {
 	err := cmd.Run()
 
 	if err != nil {
-		t.Errorf("Something went wrong")
+		t.Errorf("Something went wrong: %v", err)
 	}
 
 	if strings.Contains(out.String(), "Usage of ./sandy:") {
