@@ -140,6 +140,12 @@ func (i *arrayFlags) Set(value string) error {
 	return nil
 }
 
+// sandyUsage func is the usage handler for the sandy command
+func sandyUsage() {
+	fmt.Printf("Usage: %s [OPTIONS] command\n", os.Args[0])
+	flag.PrintDefaults()
+}
+
 func main() {
 	var allowedPattern arrayFlags
 	var blockedPattern arrayFlags
@@ -147,13 +153,15 @@ func main() {
 	// TODO add sane defaults like libc etc
 	allowedPattern = append(allowedPattern, "")
 
-	flag.Var(&allowedPattern, "y", "A glob pattern for automatically allowing file reads.")
-	flag.Var(&blockedPattern, "n", "A glob pattern for automatically blocking file reads.")
-	help := flag.Bool("h", false, "Print Usage.")
+	// overriding the Usage handler
+	flag.Usage = sandyUsage
+	flag.Var(&blockedPattern, "n", "A glob pattern for automatically blocking file reads.\nFor example, \"/etc/password.txt\" or \"*.txt\".")
+	flag.Var(&allowedPattern, "y", "A glob pattern for automatically allowing file reads.\nExpected format is same as -n.")
+	showHelp := flag.Bool("h", false, "Print Usage.")
 
 	flag.Parse()
 
-	if *help == true {
+	if flag.NArg() < 1  || *showHelp {
 		flag.Usage()
 		return
 	}
